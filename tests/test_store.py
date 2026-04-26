@@ -151,6 +151,24 @@ def test_batch_put_ops(store: RedisStore) -> None:
     assert item3 is None
 
 
+def test_delete_escapes_memory_style_keys(store: RedisStore) -> None:
+    """Delete keys with punctuation used by Deep Agents memory paths."""
+    namespace = ("atlas-architect", "memories")
+    keys = [
+        "/ui-validation.md",
+        "/with:colon.md",
+        "/nested/path-with-hyphen:colon.md",
+    ]
+
+    for key in keys:
+        store.put(namespace, key, {"content": f"content for {key}"})
+        assert store.get(namespace, key) is not None
+
+    for key in keys:
+        store.delete(namespace, key)
+        assert store.get(namespace, key) is None
+
+
 def test_batch_search_ops(store: RedisStore) -> None:
     """Test batch operations with search operations."""
     # Setup test data

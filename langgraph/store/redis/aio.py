@@ -37,6 +37,7 @@ from langgraph.store.redis.base import (
     RedisDocument,
     _decode_ns,
     _ensure_string_or_literal,
+    _exact_store_key_query,
     _group_ops,
     _namespace_to_text,
     _row_to_item,
@@ -560,8 +561,7 @@ class AsyncRedisStore(
         if deletes:
             # Delete matching documents
             for op in deletes:
-                prefix = _namespace_to_text(op.namespace)
-                query = f"(@prefix:{prefix} @key:{{{op.key}}})"
+                query = _exact_store_key_query(op.namespace, op.key)
                 results = await self.store_index.search(query)
                 for doc in results.docs:
                     await self._redis.delete(doc.id)
@@ -621,8 +621,7 @@ class AsyncRedisStore(
 
         # First delete any existing documents that are being updated/deleted
         for _, op in put_ops:
-            namespace = _namespace_to_text(op.namespace)
-            query = f"@prefix:{namespace} @key:{{{_token_escaper.escape(op.key)}}}"
+            query = _exact_store_key_query(op.namespace, op.key)
             results = await self.store_index.search(query)
 
             if self.cluster_mode:

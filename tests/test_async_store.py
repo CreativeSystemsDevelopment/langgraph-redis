@@ -108,6 +108,25 @@ async def test_basic_ops(store: AsyncRedisStore) -> None:
 
 
 @pytest.mark.asyncio
+async def test_delete_escapes_memory_style_keys(store: AsyncRedisStore) -> None:
+    """Delete keys with punctuation used by Deep Agents memory paths."""
+    namespace = ("atlas-architect", "memories")
+    keys = [
+        "/ui-validation.md",
+        "/with:colon.md",
+        "/nested/path-with-hyphen:colon.md",
+    ]
+
+    for key in keys:
+        await store.aput(namespace, key, {"content": f"content for {key}"})
+        assert await store.aget(namespace, key) is not None
+
+    for key in keys:
+        await store.adelete(namespace, key)
+        assert await store.aget(namespace, key) is None
+
+
+@pytest.mark.asyncio
 async def test_search(store: AsyncRedisStore) -> None:
     """Test search functionality with async store."""
     # Create test data
