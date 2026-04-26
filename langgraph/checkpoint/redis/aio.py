@@ -698,7 +698,7 @@ class AsyncRedisSaver(
         if requires_post_filter:
             result_docs = []
             offset = 0
-            page_size = 10000
+            page_size = min(10000, max(100, (limit or 10000) * 10))
             while True:
                 query = FilterQuery(
                     filter_expression=combined_filter,
@@ -708,7 +708,25 @@ class AsyncRedisSaver(
                 )
                 query.paging(offset, page_size)
                 results = await self.checkpoints_index.search(query)
-                result_docs.extend(results.docs)
+                for doc in results.docs:
+                    checkpoint_id = from_storage_safe_id(doc["checkpoint_id"])
+                    doc_dict = doc.__dict__ if hasattr(doc, "__dict__") else {}
+                    raw_metadata = doc_dict.get("$.metadata") or getattr(
+                        doc, "$.metadata", "{}"
+                    )
+                    metadata_dict = (
+                        orjson.loads(raw_metadata)
+                        if isinstance(raw_metadata, str)
+                        else raw_metadata
+                    )
+                    if _checkpoint_id_filter_matches(
+                        checkpoint_id, before_checkpoint_id
+                    ) and _metadata_filter_matches(metadata_dict, filter):
+                        result_docs.append(doc)
+                        if limit is not None and len(result_docs) >= limit:
+                            break
+                if limit is not None and len(result_docs) >= limit:
+                    break
                 if len(results.docs) < page_size:
                     break
                 offset += page_size
