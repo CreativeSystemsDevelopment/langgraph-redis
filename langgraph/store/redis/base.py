@@ -100,6 +100,13 @@ def _ensure_string_or_literal(value: Any) -> str:
     return str(value)
 
 
+def _exact_store_key_query(namespace: tuple[str, ...], key: str) -> str:
+    """Build a RediSearch query for one store key with proper escaping."""
+    prefix_filter = Text("prefix") == _namespace_to_text(namespace)
+    key_filter = Tag("key") == key
+    return f"({prefix_filter} {key_filter})"
+
+
 C = TypeVar("C", bound=Union[Redis, AsyncRedis])
 
 
@@ -518,8 +525,7 @@ class BaseRedisStore(Generic[RedisClientType, IndexType]):
         if deletes:
             # Delete matching documents
             for op in deletes:
-                prefix = _namespace_to_text(op.namespace)
-                query = f"(@prefix:{prefix} @key:{{{op.key}}})"
+                query = _exact_store_key_query(op.namespace, op.key)
                 results = self.store_index.search(query)
                 for doc in results.docs:
                     self._redis.delete(doc.id)
